@@ -1,0 +1,246 @@
+"""Crea la base BDAutos en MongoDB desde Python (PyMongo).
+
+Hace lo mismo que 01_crear_bdautos.js, pero sin necesitar mongosh:
+  python crear_bd.py
+"""
+from conexion import BD, URI, get_db
+
+db = get_db(URI, BD)
+
+# 1. Empezar limpio
+db.drop_collection("makers")
+db.drop_collection("cars")
+
+# 2. Crear las colecciones con validación (reglas que deben cumplir los documentos)
+db.create_collection("makers", validator={
+    "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["_id", "name", "fullName", "country", "models"],
+        "properties": {
+            "_id": {"bsonType": "int"},
+            "name": {"bsonType": "string", "maxLength": 15},
+            "fullName": {"bsonType": "string", "maxLength": 25},
+            "country": {
+                "bsonType": "object",
+                "required": ["name", "continent"],
+                "properties": {
+                    "name": {"bsonType": "string", "maxLength": 20},
+                    "continent": {"enum": ["america", "europe", "asia", "africa", "australia"]}
+                }
+            },
+            "models": {
+                "bsonType": "array",
+                "items": {
+                    "bsonType": "object",
+                    "required": ["_id", "name"],
+                    "properties": {"_id": {"bsonType": "int"}, "name": {"bsonType": "string", "maxLength": 25}}
+                }
+            }
+        }
+    }
+})
+
+db.create_collection("cars", validator={
+    "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["_id", "descr", "year", "model", "maker", "specs"],
+        "properties": {
+            "_id": {"bsonType": "int"},
+            "descr": {"bsonType": "string", "maxLength": 40},
+            "year": {"bsonType": "int", "minimum": 1900, "maximum": 2100},
+            "model": {"bsonType": "object", "required": ["_id", "name"]},
+            "maker": {"bsonType": "object", "required": ["_id", "name", "country", "continent"]},
+            "specs": {
+                "bsonType": "object",
+                "required": ["mpg", "cylinders", "edispl", "horsepower", "weight", "accel"],
+                "properties": {
+                    "mpg": {"bsonType": ["int", "double"]},
+                    "cylinders": {"bsonType": "int"},
+                    "edispl": {"bsonType": "int"},
+                    "horsepower": {"bsonType": "int"},
+                    "weight": {"bsonType": "int"},
+                    "accel": {"bsonType": ["int", "double"]}
+                }
+            }
+        }
+    }
+})
+
+# 3. Insertar los fabricantes: país/continente y marcas van incrustados (embedding)
+makers = [
+    {"_id": 1, "name": "gm", "fullName": "General Motors", "country": {"name": "usa", "continent": "america"}, "models": [{"_id": 1, "name": "chevrolet"}, {"_id": 2, "name": "gmc"}, {"_id": 3, "name": "cadillac"}, {"_id": 4, "name": "buick"}]},
+    {"_id": 2, "name": "ford", "fullName": "Ford Motor Company", "country": {"name": "usa", "continent": "america"}, "models": [{"_id": 5, "name": "ford"}, {"_id": 6, "name": "lincoln"}]},
+    {"_id": 3, "name": "stellantis", "fullName": "Stellantis N.V.", "country": {"name": "netherlands", "continent": "europe"}, "models": [{"_id": 7, "name": "jeep"}, {"_id": 8, "name": "dodge"}, {"_id": 9, "name": "ram"}, {"_id": 10, "name": "chrysler"}, {"_id": 11, "name": "fiat"}, {"_id": 12, "name": "peugeot"}, {"_id": 13, "name": "alfa romeo"}]},
+    {"_id": 4, "name": "toyota", "fullName": "Toyota Motor Corporation", "country": {"name": "japan", "continent": "asia"}, "models": [{"_id": 14, "name": "toyota"}, {"_id": 15, "name": "lexus"}]},
+    {"_id": 5, "name": "honda", "fullName": "Honda Motor Co.", "country": {"name": "japan", "continent": "asia"}, "models": [{"_id": 16, "name": "honda"}, {"_id": 17, "name": "acura"}]},
+    {"_id": 6, "name": "nissan", "fullName": "Nissan Motor Co.", "country": {"name": "japan", "continent": "asia"}, "models": [{"_id": 18, "name": "nissan"}, {"_id": 19, "name": "infiniti"}]},
+    {"_id": 7, "name": "mazda", "fullName": "Mazda Motor Corporation", "country": {"name": "japan", "continent": "asia"}, "models": [{"_id": 20, "name": "mazda"}]},
+    {"_id": 8, "name": "subaru", "fullName": "Subaru Corporation", "country": {"name": "japan", "continent": "asia"}, "models": [{"_id": 21, "name": "subaru"}]},
+    {"_id": 9, "name": "mitsubishi", "fullName": "Mitsubishi Motors", "country": {"name": "japan", "continent": "asia"}, "models": [{"_id": 22, "name": "mitsubishi"}]},
+    {"_id": 10, "name": "suzuki", "fullName": "Suzuki Motor Corporation", "country": {"name": "japan", "continent": "asia"}, "models": [{"_id": 23, "name": "suzuki"}]},
+    {"_id": 11, "name": "hyundai", "fullName": "Hyundai Motor Group", "country": {"name": "korea", "continent": "asia"}, "models": [{"_id": 24, "name": "hyundai"}, {"_id": 25, "name": "kia"}, {"_id": 26, "name": "genesis"}]},
+    {"_id": 12, "name": "volkswagen", "fullName": "Volkswagen Group", "country": {"name": "germany", "continent": "europe"}, "models": [{"_id": 27, "name": "volkswagen"}, {"_id": 28, "name": "audi"}, {"_id": 29, "name": "porsche"}, {"_id": 30, "name": "lamborghini"}, {"_id": 31, "name": "bentley"}]},
+    {"_id": 13, "name": "bmw", "fullName": "BMW Group", "country": {"name": "germany", "continent": "europe"}, "models": [{"_id": 32, "name": "bmw"}, {"_id": 33, "name": "mini"}]},
+    {"_id": 14, "name": "mercedes-benz", "fullName": "Mercedes-Benz Group", "country": {"name": "germany", "continent": "europe"}, "models": [{"_id": 34, "name": "mercedes-benz"}]},
+    {"_id": 15, "name": "renault", "fullName": "Renault Group", "country": {"name": "france", "continent": "europe"}, "models": [{"_id": 35, "name": "renault"}, {"_id": 36, "name": "dacia"}]},
+    {"_id": 16, "name": "volvo", "fullName": "Volvo Cars", "country": {"name": "sweden", "continent": "europe"}, "models": [{"_id": 37, "name": "volvo"}]},
+    {"_id": 17, "name": "jlr", "fullName": "Jaguar Land Rover", "country": {"name": "uk", "continent": "europe"}, "models": [{"_id": 38, "name": "land rover"}, {"_id": 39, "name": "jaguar"}]},
+    {"_id": 18, "name": "ferrari", "fullName": "Ferrari N.V.", "country": {"name": "italy", "continent": "europe"}, "models": [{"_id": 40, "name": "ferrari"}]},
+    {"_id": 19, "name": "saic", "fullName": "SAIC Motor", "country": {"name": "china", "continent": "asia"}, "models": [{"_id": 41, "name": "mg"}]},
+    {"_id": 20, "name": "chery", "fullName": "Chery Automobile", "country": {"name": "china", "continent": "asia"}, "models": [{"_id": 42, "name": "chery"}]}
+]
+resultado = db.makers.insert_many(makers)
+print("makers insertados:", len(resultado.inserted_ids))
+
+# 4. Insertar los autos: specs incrustado; maker._id y model._id son referencias (linking)
+cars = [
+    {"_id": 1, "descr": "chevrolet silverado 1500 lt 5.3", "year": 2024, "model": {"_id": 1, "name": "chevrolet"}, "maker": {"_id": 1, "name": "gm", "country": "usa", "continent": "america"}, "specs": {"mpg": 18, "cylinders": 8, "edispl": 325, "horsepower": 355, "weight": 5100, "accel": 6.7}},
+    {"_id": 2, "descr": "chevrolet tahoe lt 5.3", "year": 2024, "model": {"_id": 1, "name": "chevrolet"}, "maker": {"_id": 1, "name": "gm", "country": "usa", "continent": "america"}, "specs": {"mpg": 17, "cylinders": 8, "edispl": 325, "horsepower": 355, "weight": 5600, "accel": 7}},
+    {"_id": 3, "descr": "chevrolet equinox lt 1.5t", "year": 2025, "model": {"_id": 1, "name": "chevrolet"}, "maker": {"_id": 1, "name": "gm", "country": "usa", "continent": "america"}, "specs": {"mpg": 26, "cylinders": 4, "edispl": 91, "horsepower": 175, "weight": 3600, "accel": 8.5}},
+    {"_id": 4, "descr": "chevrolet trax 1rs 1.2t", "year": 2025, "model": {"_id": 1, "name": "chevrolet"}, "maker": {"_id": 1, "name": "gm", "country": "usa", "continent": "america"}, "specs": {"mpg": 30, "cylinders": 3, "edispl": 73, "horsepower": 137, "weight": 3100, "accel": 9}},
+    {"_id": 5, "descr": "chevrolet malibu lt 1.5t", "year": 2024, "model": {"_id": 1, "name": "chevrolet"}, "maker": {"_id": 1, "name": "gm", "country": "usa", "continent": "america"}, "specs": {"mpg": 32, "cylinders": 4, "edispl": 91, "horsepower": 160, "weight": 3150, "accel": 8}},
+    {"_id": 6, "descr": "chevrolet corvette stingray 6.2", "year": 2025, "model": {"_id": 1, "name": "chevrolet"}, "maker": {"_id": 1, "name": "gm", "country": "usa", "continent": "america"}, "specs": {"mpg": 19, "cylinders": 8, "edispl": 376, "horsepower": 495, "weight": 3650, "accel": 2.9}},
+    {"_id": 7, "descr": "chevrolet camaro ss 6.2", "year": 2024, "model": {"_id": 1, "name": "chevrolet"}, "maker": {"_id": 1, "name": "gm", "country": "usa", "continent": "america"}, "specs": {"mpg": 19, "cylinders": 8, "edispl": 376, "horsepower": 455, "weight": 3685, "accel": 4}},
+    {"_id": 8, "descr": "chevrolet colorado z71 2.7t", "year": 2025, "model": {"_id": 1, "name": "chevrolet"}, "maker": {"_id": 1, "name": "gm", "country": "usa", "continent": "america"}, "specs": {"mpg": 19, "cylinders": 4, "edispl": 165, "horsepower": 310, "weight": 4500, "accel": 6.5}},
+    {"_id": 9, "descr": "gmc sierra 1500 denali 6.2", "year": 2024, "model": {"_id": 2, "name": "gmc"}, "maker": {"_id": 1, "name": "gm", "country": "usa", "continent": "america"}, "specs": {"mpg": 17, "cylinders": 8, "edispl": 376, "horsepower": 420, "weight": 5600, "accel": 5.9}},
+    {"_id": 10, "descr": "gmc yukon denali 6.2", "year": 2025, "model": {"_id": 2, "name": "gmc"}, "maker": {"_id": 1, "name": "gm", "country": "usa", "continent": "america"}, "specs": {"mpg": 16, "cylinders": 8, "edispl": 376, "horsepower": 420, "weight": 5900, "accel": 6.1}},
+    {"_id": 11, "descr": "gmc terrain sle 1.5t", "year": 2024, "model": {"_id": 2, "name": "gmc"}, "maker": {"_id": 1, "name": "gm", "country": "usa", "continent": "america"}, "specs": {"mpg": 26, "cylinders": 4, "edispl": 91, "horsepower": 175, "weight": 3500, "accel": 9.1}},
+    {"_id": 12, "descr": "cadillac escalade 6.2", "year": 2024, "model": {"_id": 3, "name": "cadillac"}, "maker": {"_id": 1, "name": "gm", "country": "usa", "continent": "america"}, "specs": {"mpg": 16, "cylinders": 8, "edispl": 376, "horsepower": 420, "weight": 5900, "accel": 5.9}},
+    {"_id": 13, "descr": "cadillac ct5-v blackwing 6.2", "year": 2024, "model": {"_id": 3, "name": "cadillac"}, "maker": {"_id": 1, "name": "gm", "country": "usa", "continent": "america"}, "specs": {"mpg": 15, "cylinders": 8, "edispl": 376, "horsepower": 668, "weight": 4125, "accel": 3.6}},
+    {"_id": 14, "descr": "cadillac xt5 premium luxury 2.0t", "year": 2024, "model": {"_id": 3, "name": "cadillac"}, "maker": {"_id": 1, "name": "gm", "country": "usa", "continent": "america"}, "specs": {"mpg": 24, "cylinders": 4, "edispl": 122, "horsepower": 235, "weight": 4200, "accel": 7.3}},
+    {"_id": 15, "descr": "buick envista 1.2t", "year": 2025, "model": {"_id": 4, "name": "buick"}, "maker": {"_id": 1, "name": "gm", "country": "usa", "continent": "america"}, "specs": {"mpg": 30, "cylinders": 3, "edispl": 73, "horsepower": 137, "weight": 3100, "accel": 9.2}},
+    {"_id": 16, "descr": "buick enclave 2.5t", "year": 2025, "model": {"_id": 4, "name": "buick"}, "maker": {"_id": 1, "name": "gm", "country": "usa", "continent": "america"}, "specs": {"mpg": 22, "cylinders": 4, "edispl": 152, "horsepower": 328, "weight": 4650, "accel": 6.5}},
+    {"_id": 17, "descr": "ford f-150 xlt 2.7 ecoboost", "year": 2024, "model": {"_id": 5, "name": "ford"}, "maker": {"_id": 2, "name": "ford", "country": "usa", "continent": "america"}, "specs": {"mpg": 21, "cylinders": 6, "edispl": 165, "horsepower": 325, "weight": 4700, "accel": 6.3}},
+    {"_id": 18, "descr": "ford f-150 raptor 3.5", "year": 2024, "model": {"_id": 5, "name": "ford"}, "maker": {"_id": 2, "name": "ford", "country": "usa", "continent": "america"}, "specs": {"mpg": 16, "cylinders": 6, "edispl": 214, "horsepower": 450, "weight": 5700, "accel": 5.4}},
+    {"_id": 19, "descr": "ford mustang gt 5.0", "year": 2024, "model": {"_id": 5, "name": "ford"}, "maker": {"_id": 2, "name": "ford", "country": "usa", "continent": "america"}, "specs": {"mpg": 18, "cylinders": 8, "edispl": 307, "horsepower": 480, "weight": 3900, "accel": 4.2}},
+    {"_id": 20, "descr": "ford mustang ecoboost 2.3", "year": 2024, "model": {"_id": 5, "name": "ford"}, "maker": {"_id": 2, "name": "ford", "country": "usa", "continent": "america"}, "specs": {"mpg": 25, "cylinders": 4, "edispl": 140, "horsepower": 315, "weight": 3550, "accel": 5.3}},
+    {"_id": 21, "descr": "ford bronco sport big bend 1.5t", "year": 2024, "model": {"_id": 5, "name": "ford"}, "maker": {"_id": 2, "name": "ford", "country": "usa", "continent": "america"}, "specs": {"mpg": 26, "cylinders": 3, "edispl": 91, "horsepower": 180, "weight": 3500, "accel": 8.8}},
+    {"_id": 22, "descr": "ford bronco badlands 2.7", "year": 2024, "model": {"_id": 5, "name": "ford"}, "maker": {"_id": 2, "name": "ford", "country": "usa", "continent": "america"}, "specs": {"mpg": 17, "cylinders": 6, "edispl": 165, "horsepower": 330, "weight": 4750, "accel": 6.4}},
+    {"_id": 23, "descr": "ford ranger lariat 2.3", "year": 2024, "model": {"_id": 5, "name": "ford"}, "maker": {"_id": 2, "name": "ford", "country": "usa", "continent": "america"}, "specs": {"mpg": 21, "cylinders": 4, "edispl": 140, "horsepower": 270, "weight": 4400, "accel": 6.8}},
+    {"_id": 24, "descr": "ford explorer st 3.0", "year": 2025, "model": {"_id": 5, "name": "ford"}, "maker": {"_id": 2, "name": "ford", "country": "usa", "continent": "america"}, "specs": {"mpg": 20, "cylinders": 6, "edispl": 183, "horsepower": 400, "weight": 4700, "accel": 5.2}},
+    {"_id": 25, "descr": "ford escape st-line 1.5t", "year": 2025, "model": {"_id": 5, "name": "ford"}, "maker": {"_id": 2, "name": "ford", "country": "usa", "continent": "america"}, "specs": {"mpg": 30, "cylinders": 3, "edispl": 91, "horsepower": 180, "weight": 3500, "accel": 8.3}},
+    {"_id": 26, "descr": "ford maverick xlt hybrid 2.5", "year": 2024, "model": {"_id": 5, "name": "ford"}, "maker": {"_id": 2, "name": "ford", "country": "usa", "continent": "america"}, "specs": {"mpg": 37, "cylinders": 4, "edispl": 152, "horsepower": 191, "weight": 3700, "accel": 7.7}},
+    {"_id": 27, "descr": "lincoln navigator 3.5", "year": 2024, "model": {"_id": 6, "name": "lincoln"}, "maker": {"_id": 2, "name": "ford", "country": "usa", "continent": "america"}, "specs": {"mpg": 18, "cylinders": 6, "edispl": 214, "horsepower": 440, "weight": 5900, "accel": 6}},
+    {"_id": 28, "descr": "lincoln aviator 3.0", "year": 2024, "model": {"_id": 6, "name": "lincoln"}, "maker": {"_id": 2, "name": "ford", "country": "usa", "continent": "america"}, "specs": {"mpg": 21, "cylinders": 6, "edispl": 183, "horsepower": 400, "weight": 4900, "accel": 5.6}},
+    {"_id": 29, "descr": "jeep wrangler rubicon 3.6", "year": 2024, "model": {"_id": 7, "name": "jeep"}, "maker": {"_id": 3, "name": "stellantis", "country": "netherlands", "continent": "europe"}, "specs": {"mpg": 19, "cylinders": 6, "edispl": 220, "horsepower": 285, "weight": 4500, "accel": 7}},
+    {"_id": 30, "descr": "jeep grand cherokee limited 3.6", "year": 2024, "model": {"_id": 7, "name": "jeep"}, "maker": {"_id": 3, "name": "stellantis", "country": "netherlands", "continent": "europe"}, "specs": {"mpg": 22, "cylinders": 6, "edispl": 220, "horsepower": 293, "weight": 4600, "accel": 7.5}},
+    {"_id": 31, "descr": "jeep compass latitude 2.0t", "year": 2024, "model": {"_id": 7, "name": "jeep"}, "maker": {"_id": 3, "name": "stellantis", "country": "netherlands", "continent": "europe"}, "specs": {"mpg": 25, "cylinders": 4, "edispl": 122, "horsepower": 200, "weight": 3600, "accel": 7.5}},
+    {"_id": 32, "descr": "jeep gladiator sport 3.6", "year": 2024, "model": {"_id": 7, "name": "jeep"}, "maker": {"_id": 3, "name": "stellantis", "country": "netherlands", "continent": "europe"}, "specs": {"mpg": 19, "cylinders": 6, "edispl": 220, "horsepower": 285, "weight": 4900, "accel": 7.5}},
+    {"_id": 33, "descr": "dodge durango r/t 5.7", "year": 2024, "model": {"_id": 8, "name": "dodge"}, "maker": {"_id": 3, "name": "stellantis", "country": "netherlands", "continent": "europe"}, "specs": {"mpg": 17, "cylinders": 8, "edispl": 348, "horsepower": 360, "weight": 5250, "accel": 6.2}},
+    {"_id": 34, "descr": "dodge charger scat pack 6.4", "year": 2023, "model": {"_id": 8, "name": "dodge"}, "maker": {"_id": 3, "name": "stellantis", "country": "netherlands", "continent": "europe"}, "specs": {"mpg": 18, "cylinders": 8, "edispl": 392, "horsepower": 485, "weight": 4300, "accel": 4.3}},
+    {"_id": 35, "descr": "dodge challenger srt hellcat 6.2", "year": 2023, "model": {"_id": 8, "name": "dodge"}, "maker": {"_id": 3, "name": "stellantis", "country": "netherlands", "continent": "europe"}, "specs": {"mpg": 16, "cylinders": 8, "edispl": 376, "horsepower": 717, "weight": 4450, "accel": 3.6}},
+    {"_id": 36, "descr": "dodge hornet gt 2.0t", "year": 2024, "model": {"_id": 8, "name": "dodge"}, "maker": {"_id": 3, "name": "stellantis", "country": "netherlands", "continent": "europe"}, "specs": {"mpg": 24, "cylinders": 4, "edispl": 122, "horsepower": 268, "weight": 3700, "accel": 6.5}},
+    {"_id": 37, "descr": "ram 1500 laramie 3.0 hurricane", "year": 2025, "model": {"_id": 9, "name": "ram"}, "maker": {"_id": 3, "name": "stellantis", "country": "netherlands", "continent": "europe"}, "specs": {"mpg": 20, "cylinders": 6, "edispl": 183, "horsepower": 420, "weight": 5300, "accel": 5.8}},
+    {"_id": 38, "descr": "chrysler pacifica touring l 3.6", "year": 2024, "model": {"_id": 10, "name": "chrysler"}, "maker": {"_id": 3, "name": "stellantis", "country": "netherlands", "continent": "europe"}, "specs": {"mpg": 22, "cylinders": 6, "edispl": 220, "horsepower": 287, "weight": 4500, "accel": 7.4}},
+    {"_id": 39, "descr": "fiat 500x sport 1.3t", "year": 2023, "model": {"_id": 11, "name": "fiat"}, "maker": {"_id": 3, "name": "stellantis", "country": "netherlands", "continent": "europe"}, "specs": {"mpg": 27, "cylinders": 4, "edispl": 79, "horsepower": 177, "weight": 3300, "accel": 8.2}},
+    {"_id": 40, "descr": "peugeot 2008 gt 1.2t", "year": 2024, "model": {"_id": 12, "name": "peugeot"}, "maker": {"_id": 3, "name": "stellantis", "country": "netherlands", "continent": "europe"}, "specs": {"mpg": 40, "cylinders": 3, "edispl": 73, "horsepower": 130, "weight": 2800, "accel": 8.7}},
+    {"_id": 41, "descr": "peugeot 3008 gt 1.6t", "year": 2024, "model": {"_id": 12, "name": "peugeot"}, "maker": {"_id": 3, "name": "stellantis", "country": "netherlands", "continent": "europe"}, "specs": {"mpg": 32, "cylinders": 4, "edispl": 98, "horsepower": 165, "weight": 3200, "accel": 8.5}},
+    {"_id": 42, "descr": "alfa romeo giulia 2.0t", "year": 2024, "model": {"_id": 13, "name": "alfa romeo"}, "maker": {"_id": 3, "name": "stellantis", "country": "netherlands", "continent": "europe"}, "specs": {"mpg": 27, "cylinders": 4, "edispl": 122, "horsepower": 280, "weight": 3500, "accel": 5.5}},
+    {"_id": 43, "descr": "alfa romeo stelvio quadrifoglio 2.9", "year": 2024, "model": {"_id": 13, "name": "alfa romeo"}, "maker": {"_id": 3, "name": "stellantis", "country": "netherlands", "continent": "europe"}, "specs": {"mpg": 19, "cylinders": 6, "edispl": 177, "horsepower": 505, "weight": 4400, "accel": 3.6}},
+    {"_id": 44, "descr": "toyota corolla le 2.0", "year": 2024, "model": {"_id": 14, "name": "toyota"}, "maker": {"_id": 4, "name": "toyota", "country": "japan", "continent": "asia"}, "specs": {"mpg": 35, "cylinders": 4, "edispl": 122, "horsepower": 169, "weight": 3100, "accel": 8.3}},
+    {"_id": 45, "descr": "toyota corolla hybrid le 1.8", "year": 2024, "model": {"_id": 14, "name": "toyota"}, "maker": {"_id": 4, "name": "toyota", "country": "japan", "continent": "asia"}, "specs": {"mpg": 50, "cylinders": 4, "edispl": 110, "horsepower": 138, "weight": 3150, "accel": 9}},
+    {"_id": 46, "descr": "toyota camry le hybrid 2.5", "year": 2025, "model": {"_id": 14, "name": "toyota"}, "maker": {"_id": 4, "name": "toyota", "country": "japan", "continent": "asia"}, "specs": {"mpg": 51, "cylinders": 4, "edispl": 152, "horsepower": 225, "weight": 3500, "accel": 7.2}},
+    {"_id": 47, "descr": "toyota rav4 xle 2.5", "year": 2024, "model": {"_id": 14, "name": "toyota"}, "maker": {"_id": 4, "name": "toyota", "country": "japan", "continent": "asia"}, "specs": {"mpg": 30, "cylinders": 4, "edispl": 152, "horsepower": 203, "weight": 3500, "accel": 8}},
+    {"_id": 48, "descr": "toyota rav4 hybrid xle 2.5", "year": 2024, "model": {"_id": 14, "name": "toyota"}, "maker": {"_id": 4, "name": "toyota", "country": "japan", "continent": "asia"}, "specs": {"mpg": 40, "cylinders": 4, "edispl": 152, "horsepower": 219, "weight": 3800, "accel": 7.5}},
+    {"_id": 49, "descr": "toyota tacoma trd off-road 2.4t", "year": 2024, "model": {"_id": 14, "name": "toyota"}, "maker": {"_id": 4, "name": "toyota", "country": "japan", "continent": "asia"}, "specs": {"mpg": 20, "cylinders": 4, "edispl": 146, "horsepower": 278, "weight": 4500, "accel": 7}},
+    {"_id": 50, "descr": "toyota tundra limited 3.4", "year": 2024, "model": {"_id": 14, "name": "toyota"}, "maker": {"_id": 4, "name": "toyota", "country": "japan", "continent": "asia"}, "specs": {"mpg": 20, "cylinders": 6, "edispl": 210, "horsepower": 389, "weight": 5600, "accel": 6}},
+    {"_id": 51, "descr": "toyota 4runner sr5 2.4t", "year": 2025, "model": {"_id": 14, "name": "toyota"}, "maker": {"_id": 4, "name": "toyota", "country": "japan", "continent": "asia"}, "specs": {"mpg": 20, "cylinders": 4, "edispl": 146, "horsepower": 278, "weight": 4700, "accel": 7.5}},
+    {"_id": 52, "descr": "toyota gr86 2.4", "year": 2024, "model": {"_id": 14, "name": "toyota"}, "maker": {"_id": 4, "name": "toyota", "country": "japan", "continent": "asia"}, "specs": {"mpg": 22, "cylinders": 4, "edispl": 146, "horsepower": 228, "weight": 2811, "accel": 6.1}},
+    {"_id": 53, "descr": "toyota gr supra 3.0", "year": 2024, "model": {"_id": 14, "name": "toyota"}, "maker": {"_id": 4, "name": "toyota", "country": "japan", "continent": "asia"}, "specs": {"mpg": 26, "cylinders": 6, "edispl": 183, "horsepower": 382, "weight": 3400, "accel": 3.9}},
+    {"_id": 54, "descr": "toyota hilux 2.7", "year": 2024, "model": {"_id": 14, "name": "toyota"}, "maker": {"_id": 4, "name": "toyota", "country": "japan", "continent": "asia"}, "specs": {"mpg": 24, "cylinders": 4, "edispl": 165, "horsepower": 166, "weight": 4200, "accel": 11.5}},
+    {"_id": 55, "descr": "lexus rx 350 2.4t", "year": 2024, "model": {"_id": 15, "name": "lexus"}, "maker": {"_id": 4, "name": "toyota", "country": "japan", "continent": "asia"}, "specs": {"mpg": 24, "cylinders": 4, "edispl": 146, "horsepower": 275, "weight": 4300, "accel": 7.2}},
+    {"_id": 56, "descr": "lexus es 300h 2.5", "year": 2024, "model": {"_id": 15, "name": "lexus"}, "maker": {"_id": 4, "name": "toyota", "country": "japan", "continent": "asia"}, "specs": {"mpg": 44, "cylinders": 4, "edispl": 152, "horsepower": 215, "weight": 3700, "accel": 8}},
+    {"_id": 57, "descr": "lexus lx 600 3.4", "year": 2024, "model": {"_id": 15, "name": "lexus"}, "maker": {"_id": 4, "name": "toyota", "country": "japan", "continent": "asia"}, "specs": {"mpg": 19, "cylinders": 6, "edispl": 210, "horsepower": 409, "weight": 5900, "accel": 6.8}},
+    {"_id": 58, "descr": "honda civic ex 1.5t", "year": 2024, "model": {"_id": 16, "name": "honda"}, "maker": {"_id": 5, "name": "honda", "country": "japan", "continent": "asia"}, "specs": {"mpg": 36, "cylinders": 4, "edispl": 91, "horsepower": 180, "weight": 3000, "accel": 7.4}},
+    {"_id": 59, "descr": "honda civic type r 2.0t", "year": 2024, "model": {"_id": 16, "name": "honda"}, "maker": {"_id": 5, "name": "honda", "country": "japan", "continent": "asia"}, "specs": {"mpg": 24, "cylinders": 4, "edispl": 122, "horsepower": 315, "weight": 3200, "accel": 5}},
+    {"_id": 60, "descr": "honda accord hybrid touring 2.0", "year": 2024, "model": {"_id": 16, "name": "honda"}, "maker": {"_id": 5, "name": "honda", "country": "japan", "continent": "asia"}, "specs": {"mpg": 44, "cylinders": 4, "edispl": 122, "horsepower": 204, "weight": 3500, "accel": 6.9}},
+    {"_id": 61, "descr": "honda cr-v ex 1.5t", "year": 2024, "model": {"_id": 16, "name": "honda"}, "maker": {"_id": 5, "name": "honda", "country": "japan", "continent": "asia"}, "specs": {"mpg": 30, "cylinders": 4, "edispl": 91, "horsepower": 190, "weight": 3500, "accel": 8.4}},
+    {"_id": 62, "descr": "honda hr-v lx 2.0", "year": 2024, "model": {"_id": 16, "name": "honda"}, "maker": {"_id": 5, "name": "honda", "country": "japan", "continent": "asia"}, "specs": {"mpg": 28, "cylinders": 4, "edispl": 122, "horsepower": 158, "weight": 3100, "accel": 9.5}},
+    {"_id": 63, "descr": "honda pilot trailsport 3.5", "year": 2024, "model": {"_id": 16, "name": "honda"}, "maker": {"_id": 5, "name": "honda", "country": "japan", "continent": "asia"}, "specs": {"mpg": 20, "cylinders": 6, "edispl": 214, "horsepower": 285, "weight": 4500, "accel": 7}},
+    {"_id": 64, "descr": "acura integra a-spec 1.5t", "year": 2024, "model": {"_id": 17, "name": "acura"}, "maker": {"_id": 5, "name": "honda", "country": "japan", "continent": "asia"}, "specs": {"mpg": 33, "cylinders": 4, "edispl": 91, "horsepower": 200, "weight": 3100, "accel": 7}},
+    {"_id": 65, "descr": "acura mdx 3.5", "year": 2024, "model": {"_id": 17, "name": "acura"}, "maker": {"_id": 5, "name": "honda", "country": "japan", "continent": "asia"}, "specs": {"mpg": 22, "cylinders": 6, "edispl": 214, "horsepower": 290, "weight": 4400, "accel": 6.5}},
+    {"_id": 66, "descr": "nissan versa sr 1.6", "year": 2024, "model": {"_id": 18, "name": "nissan"}, "maker": {"_id": 6, "name": "nissan", "country": "japan", "continent": "asia"}, "specs": {"mpg": 35, "cylinders": 4, "edispl": 98, "horsepower": 122, "weight": 2700, "accel": 9.5}},
+    {"_id": 67, "descr": "nissan sentra sv 2.0", "year": 2024, "model": {"_id": 18, "name": "nissan"}, "maker": {"_id": 6, "name": "nissan", "country": "japan", "continent": "asia"}, "specs": {"mpg": 34, "cylinders": 4, "edispl": 122, "horsepower": 149, "weight": 3050, "accel": 8.7}},
+    {"_id": 68, "descr": "nissan kicks sr 2.0", "year": 2025, "model": {"_id": 18, "name": "nissan"}, "maker": {"_id": 6, "name": "nissan", "country": "japan", "continent": "asia"}, "specs": {"mpg": 31, "cylinders": 4, "edispl": 122, "horsepower": 141, "weight": 3100, "accel": 9.5}},
+    {"_id": 69, "descr": "nissan rogue sv 1.5t", "year": 2024, "model": {"_id": 18, "name": "nissan"}, "maker": {"_id": 6, "name": "nissan", "country": "japan", "continent": "asia"}, "specs": {"mpg": 33, "cylinders": 3, "edispl": 91, "horsepower": 201, "weight": 3500, "accel": 7.8}},
+    {"_id": 70, "descr": "nissan frontier pro-4x 3.8", "year": 2024, "model": {"_id": 18, "name": "nissan"}, "maker": {"_id": 6, "name": "nissan", "country": "japan", "continent": "asia"}, "specs": {"mpg": 19, "cylinders": 6, "edispl": 232, "horsepower": 310, "weight": 4600, "accel": 6.8}},
+    {"_id": 71, "descr": "nissan z performance 3.0", "year": 2024, "model": {"_id": 18, "name": "nissan"}, "maker": {"_id": 6, "name": "nissan", "country": "japan", "continent": "asia"}, "specs": {"mpg": 22, "cylinders": 6, "edispl": 183, "horsepower": 400, "weight": 3500, "accel": 4.3}},
+    {"_id": 72, "descr": "nissan np300 2.5", "year": 2024, "model": {"_id": 18, "name": "nissan"}, "maker": {"_id": 6, "name": "nissan", "country": "japan", "continent": "asia"}, "specs": {"mpg": 23, "cylinders": 4, "edispl": 152, "horsepower": 164, "weight": 4000, "accel": 11}},
+    {"_id": 73, "descr": "infiniti qx60 2.0t", "year": 2025, "model": {"_id": 19, "name": "infiniti"}, "maker": {"_id": 6, "name": "nissan", "country": "japan", "continent": "asia"}, "specs": {"mpg": 25, "cylinders": 4, "edispl": 122, "horsepower": 268, "weight": 4600, "accel": 7}},
+    {"_id": 74, "descr": "mazda 3 hatchback 2.5 s", "year": 2024, "model": {"_id": 20, "name": "mazda"}, "maker": {"_id": 7, "name": "mazda", "country": "japan", "continent": "asia"}, "specs": {"mpg": 31, "cylinders": 4, "edispl": 152, "horsepower": 191, "weight": 3100, "accel": 7.5}},
+    {"_id": 75, "descr": "mazda cx-5 2.5 s", "year": 2024, "model": {"_id": 20, "name": "mazda"}, "maker": {"_id": 7, "name": "mazda", "country": "japan", "continent": "asia"}, "specs": {"mpg": 26, "cylinders": 4, "edispl": 152, "horsepower": 187, "weight": 3600, "accel": 8.2}},
+    {"_id": 76, "descr": "mazda cx-50 2.5 turbo", "year": 2024, "model": {"_id": 20, "name": "mazda"}, "maker": {"_id": 7, "name": "mazda", "country": "japan", "continent": "asia"}, "specs": {"mpg": 25, "cylinders": 4, "edispl": 152, "horsepower": 256, "weight": 3900, "accel": 6.6}},
+    {"_id": 77, "descr": "mazda cx-90 3.3 turbo", "year": 2024, "model": {"_id": 20, "name": "mazda"}, "maker": {"_id": 7, "name": "mazda", "country": "japan", "continent": "asia"}, "specs": {"mpg": 25, "cylinders": 6, "edispl": 201, "horsepower": 280, "weight": 4600, "accel": 6.8}},
+    {"_id": 78, "descr": "mazda mx-5 miata 2.0", "year": 2024, "model": {"_id": 20, "name": "mazda"}, "maker": {"_id": 7, "name": "mazda", "country": "japan", "continent": "asia"}, "specs": {"mpg": 30, "cylinders": 4, "edispl": 122, "horsepower": 181, "weight": 2350, "accel": 5.7}},
+    {"_id": 79, "descr": "subaru outback 2.5", "year": 2024, "model": {"_id": 21, "name": "subaru"}, "maker": {"_id": 8, "name": "subaru", "country": "japan", "continent": "asia"}, "specs": {"mpg": 29, "cylinders": 4, "edispl": 152, "horsepower": 182, "weight": 3700, "accel": 8.8}},
+    {"_id": 80, "descr": "subaru wrx 2.4t", "year": 2024, "model": {"_id": 21, "name": "subaru"}, "maker": {"_id": 8, "name": "subaru", "country": "japan", "continent": "asia"}, "specs": {"mpg": 22, "cylinders": 4, "edispl": 146, "horsepower": 271, "weight": 3400, "accel": 5.5}},
+    {"_id": 81, "descr": "subaru forester 2.5", "year": 2025, "model": {"_id": 21, "name": "subaru"}, "maker": {"_id": 8, "name": "subaru", "country": "japan", "continent": "asia"}, "specs": {"mpg": 29, "cylinders": 4, "edispl": 152, "horsepower": 180, "weight": 3500, "accel": 8.5}},
+    {"_id": 82, "descr": "subaru crosstrek 2.5", "year": 2024, "model": {"_id": 21, "name": "subaru"}, "maker": {"_id": 8, "name": "subaru", "country": "japan", "continent": "asia"}, "specs": {"mpg": 29, "cylinders": 4, "edispl": 152, "horsepower": 182, "weight": 3300, "accel": 8.5}},
+    {"_id": 83, "descr": "mitsubishi outlander se 2.5", "year": 2024, "model": {"_id": 22, "name": "mitsubishi"}, "maker": {"_id": 9, "name": "mitsubishi", "country": "japan", "continent": "asia"}, "specs": {"mpg": 26, "cylinders": 4, "edispl": 152, "horsepower": 181, "weight": 3600, "accel": 8.6}},
+    {"_id": 84, "descr": "mitsubishi mirage g4 1.2", "year": 2024, "model": {"_id": 22, "name": "mitsubishi"}, "maker": {"_id": 9, "name": "mitsubishi", "country": "japan", "continent": "asia"}, "specs": {"mpg": 39, "cylinders": 3, "edispl": 73, "horsepower": 78, "weight": 2100, "accel": 11.5}},
+    {"_id": 85, "descr": "mitsubishi l200 2.4", "year": 2024, "model": {"_id": 22, "name": "mitsubishi"}, "maker": {"_id": 9, "name": "mitsubishi", "country": "japan", "continent": "asia"}, "specs": {"mpg": 22, "cylinders": 4, "edispl": 146, "horsepower": 181, "weight": 4300, "accel": 10.5}},
+    {"_id": 86, "descr": "suzuki swift 1.2", "year": 2024, "model": {"_id": 23, "name": "suzuki"}, "maker": {"_id": 10, "name": "suzuki", "country": "japan", "continent": "asia"}, "specs": {"mpg": 44, "cylinders": 3, "edispl": 73, "horsepower": 81, "weight": 2100, "accel": 12}},
+    {"_id": 87, "descr": "suzuki vitara 1.4t", "year": 2024, "model": {"_id": 23, "name": "suzuki"}, "maker": {"_id": 10, "name": "suzuki", "country": "japan", "continent": "asia"}, "specs": {"mpg": 36, "cylinders": 4, "edispl": 85, "horsepower": 138, "weight": 2750, "accel": 9.5}},
+    {"_id": 88, "descr": "suzuki jimny 1.5", "year": 2024, "model": {"_id": 23, "name": "suzuki"}, "maker": {"_id": 10, "name": "suzuki", "country": "japan", "continent": "asia"}, "specs": {"mpg": 34, "cylinders": 4, "edispl": 91, "horsepower": 101, "weight": 2500, "accel": 12}},
+    {"_id": 89, "descr": "hyundai elantra sel 2.0", "year": 2024, "model": {"_id": 24, "name": "hyundai"}, "maker": {"_id": 11, "name": "hyundai", "country": "korea", "continent": "asia"}, "specs": {"mpg": 36, "cylinders": 4, "edispl": 122, "horsepower": 147, "weight": 2900, "accel": 8.5}},
+    {"_id": 90, "descr": "hyundai elantra n 2.0t", "year": 2024, "model": {"_id": 24, "name": "hyundai"}, "maker": {"_id": 11, "name": "hyundai", "country": "korea", "continent": "asia"}, "specs": {"mpg": 25, "cylinders": 4, "edispl": 122, "horsepower": 276, "weight": 3200, "accel": 5.3}},
+    {"_id": 91, "descr": "hyundai tucson sel 2.5", "year": 2024, "model": {"_id": 24, "name": "hyundai"}, "maker": {"_id": 11, "name": "hyundai", "country": "korea", "continent": "asia"}, "specs": {"mpg": 28, "cylinders": 4, "edispl": 152, "horsepower": 187, "weight": 3500, "accel": 8.6}},
+    {"_id": 92, "descr": "hyundai santa fe 2.5t", "year": 2024, "model": {"_id": 24, "name": "hyundai"}, "maker": {"_id": 11, "name": "hyundai", "country": "korea", "continent": "asia"}, "specs": {"mpg": 24, "cylinders": 4, "edispl": 152, "horsepower": 277, "weight": 4200, "accel": 6.5}},
+    {"_id": 93, "descr": "hyundai palisade 3.8", "year": 2024, "model": {"_id": 24, "name": "hyundai"}, "maker": {"_id": 11, "name": "hyundai", "country": "korea", "continent": "asia"}, "specs": {"mpg": 22, "cylinders": 6, "edispl": 232, "horsepower": 291, "weight": 4300, "accel": 7.2}},
+    {"_id": 94, "descr": "hyundai creta 1.5", "year": 2024, "model": {"_id": 24, "name": "hyundai"}, "maker": {"_id": 11, "name": "hyundai", "country": "korea", "continent": "asia"}, "specs": {"mpg": 35, "cylinders": 4, "edispl": 91, "horsepower": 113, "weight": 2700, "accel": 11.5}},
+    {"_id": 95, "descr": "kia forte lxs 2.0", "year": 2024, "model": {"_id": 25, "name": "kia"}, "maker": {"_id": 11, "name": "hyundai", "country": "korea", "continent": "asia"}, "specs": {"mpg": 34, "cylinders": 4, "edispl": 122, "horsepower": 147, "weight": 2900, "accel": 8.6}},
+    {"_id": 96, "descr": "kia sportage lx 2.5", "year": 2024, "model": {"_id": 25, "name": "kia"}, "maker": {"_id": 11, "name": "hyundai", "country": "korea", "continent": "asia"}, "specs": {"mpg": 28, "cylinders": 4, "edispl": 152, "horsepower": 187, "weight": 3500, "accel": 8.6}},
+    {"_id": 97, "descr": "kia telluride sx 3.8", "year": 2024, "model": {"_id": 25, "name": "kia"}, "maker": {"_id": 11, "name": "hyundai", "country": "korea", "continent": "asia"}, "specs": {"mpg": 23, "cylinders": 6, "edispl": 232, "horsepower": 291, "weight": 4400, "accel": 7.1}},
+    {"_id": 98, "descr": "kia k5 gt 2.5t", "year": 2024, "model": {"_id": 25, "name": "kia"}, "maker": {"_id": 11, "name": "hyundai", "country": "korea", "continent": "asia"}, "specs": {"mpg": 27, "cylinders": 4, "edispl": 152, "horsepower": 290, "weight": 3500, "accel": 5.5}},
+    {"_id": 99, "descr": "kia sorento 2.5", "year": 2024, "model": {"_id": 25, "name": "kia"}, "maker": {"_id": 11, "name": "hyundai", "country": "korea", "continent": "asia"}, "specs": {"mpg": 26, "cylinders": 4, "edispl": 152, "horsepower": 191, "weight": 3900, "accel": 9}},
+    {"_id": 100, "descr": "genesis g70 3.3t", "year": 2024, "model": {"_id": 26, "name": "genesis"}, "maker": {"_id": 11, "name": "hyundai", "country": "korea", "continent": "asia"}, "specs": {"mpg": 20, "cylinders": 6, "edispl": 201, "horsepower": 365, "weight": 3900, "accel": 4.5}},
+    {"_id": 101, "descr": "genesis gv80 2.5t", "year": 2024, "model": {"_id": 26, "name": "genesis"}, "maker": {"_id": 11, "name": "hyundai", "country": "korea", "continent": "asia"}, "specs": {"mpg": 22, "cylinders": 4, "edispl": 152, "horsepower": 300, "weight": 4700, "accel": 6}},
+    {"_id": 102, "descr": "volkswagen jetta se 1.5t", "year": 2024, "model": {"_id": 27, "name": "volkswagen"}, "maker": {"_id": 12, "name": "volkswagen", "country": "germany", "continent": "europe"}, "specs": {"mpg": 35, "cylinders": 4, "edispl": 91, "horsepower": 158, "weight": 3100, "accel": 8}},
+    {"_id": 103, "descr": "volkswagen golf gti 2.0t", "year": 2024, "model": {"_id": 27, "name": "volkswagen"}, "maker": {"_id": 12, "name": "volkswagen", "country": "germany", "continent": "europe"}, "specs": {"mpg": 28, "cylinders": 4, "edispl": 122, "horsepower": 241, "weight": 3200, "accel": 5.9}},
+    {"_id": 104, "descr": "volkswagen golf r 2.0t", "year": 2024, "model": {"_id": 27, "name": "volkswagen"}, "maker": {"_id": 12, "name": "volkswagen", "country": "germany", "continent": "europe"}, "specs": {"mpg": 25, "cylinders": 4, "edispl": 122, "horsepower": 315, "weight": 3500, "accel": 4.5}},
+    {"_id": 105, "descr": "volkswagen tiguan se 2.0t", "year": 2024, "model": {"_id": 27, "name": "volkswagen"}, "maker": {"_id": 12, "name": "volkswagen", "country": "germany", "continent": "europe"}, "specs": {"mpg": 26, "cylinders": 4, "edispl": 122, "horsepower": 184, "weight": 3800, "accel": 8.5}},
+    {"_id": 106, "descr": "volkswagen atlas 2.0t", "year": 2024, "model": {"_id": 27, "name": "volkswagen"}, "maker": {"_id": 12, "name": "volkswagen", "country": "germany", "continent": "europe"}, "specs": {"mpg": 22, "cylinders": 4, "edispl": 122, "horsepower": 269, "weight": 4500, "accel": 7}},
+    {"_id": 107, "descr": "volkswagen taos s 1.5t", "year": 2024, "model": {"_id": 27, "name": "volkswagen"}, "maker": {"_id": 12, "name": "volkswagen", "country": "germany", "continent": "europe"}, "specs": {"mpg": 31, "cylinders": 4, "edispl": 91, "horsepower": 158, "weight": 3200, "accel": 7.9}},
+    {"_id": 108, "descr": "audi a4 45 tfsi 2.0t", "year": 2024, "model": {"_id": 28, "name": "audi"}, "maker": {"_id": 12, "name": "volkswagen", "country": "germany", "continent": "europe"}, "specs": {"mpg": 27, "cylinders": 4, "edispl": 122, "horsepower": 261, "weight": 3700, "accel": 5.2}},
+    {"_id": 109, "descr": "audi q5 45 tfsi 2.0t", "year": 2024, "model": {"_id": 28, "name": "audi"}, "maker": {"_id": 12, "name": "volkswagen", "country": "germany", "continent": "europe"}, "specs": {"mpg": 25, "cylinders": 4, "edispl": 122, "horsepower": 261, "weight": 4100, "accel": 5.7}},
+    {"_id": 110, "descr": "audi rs 6 avant 4.0", "year": 2024, "model": {"_id": 28, "name": "audi"}, "maker": {"_id": 12, "name": "volkswagen", "country": "germany", "continent": "europe"}, "specs": {"mpg": 17, "cylinders": 8, "edispl": 244, "horsepower": 591, "weight": 4600, "accel": 3.5}},
+    {"_id": 111, "descr": "porsche 911 carrera 3.0", "year": 2024, "model": {"_id": 29, "name": "porsche"}, "maker": {"_id": 12, "name": "volkswagen", "country": "germany", "continent": "europe"}, "specs": {"mpg": 21, "cylinders": 6, "edispl": 183, "horsepower": 379, "weight": 3350, "accel": 3.9}},
+    {"_id": 112, "descr": "porsche cayenne 3.0", "year": 2024, "model": {"_id": 29, "name": "porsche"}, "maker": {"_id": 12, "name": "volkswagen", "country": "germany", "continent": "europe"}, "specs": {"mpg": 21, "cylinders": 6, "edispl": 183, "horsepower": 348, "weight": 4600, "accel": 5.7}},
+    {"_id": 113, "descr": "porsche macan t 2.0t", "year": 2024, "model": {"_id": 29, "name": "porsche"}, "maker": {"_id": 12, "name": "volkswagen", "country": "germany", "continent": "europe"}, "specs": {"mpg": 21, "cylinders": 4, "edispl": 122, "horsepower": 261, "weight": 4100, "accel": 5.9}},
+    {"_id": 114, "descr": "bmw 330i 2.0t", "year": 2024, "model": {"_id": 32, "name": "bmw"}, "maker": {"_id": 13, "name": "bmw", "country": "germany", "continent": "europe"}, "specs": {"mpg": 30, "cylinders": 4, "edispl": 122, "horsepower": 255, "weight": 3600, "accel": 5.6}},
+    {"_id": 115, "descr": "bmw m3 competition 3.0", "year": 2024, "model": {"_id": 32, "name": "bmw"}, "maker": {"_id": 13, "name": "bmw", "country": "germany", "continent": "europe"}, "specs": {"mpg": 19, "cylinders": 6, "edispl": 183, "horsepower": 503, "weight": 3900, "accel": 3.8}},
+    {"_id": 116, "descr": "bmw x3 xdrive30i 2.0t", "year": 2025, "model": {"_id": 32, "name": "bmw"}, "maker": {"_id": 13, "name": "bmw", "country": "germany", "continent": "europe"}, "specs": {"mpg": 26, "cylinders": 4, "edispl": 122, "horsepower": 255, "weight": 4200, "accel": 6}},
+    {"_id": 117, "descr": "bmw x5 xdrive40i 3.0", "year": 2024, "model": {"_id": 32, "name": "bmw"}, "maker": {"_id": 13, "name": "bmw", "country": "germany", "continent": "europe"}, "specs": {"mpg": 24, "cylinders": 6, "edispl": 183, "horsepower": 375, "weight": 4900, "accel": 5.3}},
+    {"_id": 118, "descr": "mini cooper s 2.0t", "year": 2025, "model": {"_id": 33, "name": "mini"}, "maker": {"_id": 13, "name": "bmw", "country": "germany", "continent": "europe"}, "specs": {"mpg": 31, "cylinders": 4, "edispl": 122, "horsepower": 201, "weight": 2900, "accel": 6.4}},
+    {"_id": 119, "descr": "mercedes-benz c 300 2.0t", "year": 2024, "model": {"_id": 34, "name": "mercedes-benz"}, "maker": {"_id": 14, "name": "mercedes-benz", "country": "germany", "continent": "europe"}, "specs": {"mpg": 29, "cylinders": 4, "edispl": 122, "horsepower": 255, "weight": 3800, "accel": 5.9}},
+    {"_id": 120, "descr": "mercedes-benz e 350 2.0t", "year": 2024, "model": {"_id": 34, "name": "mercedes-benz"}, "maker": {"_id": 14, "name": "mercedes-benz", "country": "germany", "continent": "europe"}, "specs": {"mpg": 27, "cylinders": 4, "edispl": 122, "horsepower": 255, "weight": 4100, "accel": 6.2}},
+    {"_id": 121, "descr": "mercedes-benz glc 300 2.0t", "year": 2024, "model": {"_id": 34, "name": "mercedes-benz"}, "maker": {"_id": 14, "name": "mercedes-benz", "country": "germany", "continent": "europe"}, "specs": {"mpg": 26, "cylinders": 4, "edispl": 122, "horsepower": 255, "weight": 4300, "accel": 6.2}},
+    {"_id": 122, "descr": "mercedes-benz amg g 63 4.0", "year": 2024, "model": {"_id": 34, "name": "mercedes-benz"}, "maker": {"_id": 14, "name": "mercedes-benz", "country": "germany", "continent": "europe"}, "specs": {"mpg": 14, "cylinders": 8, "edispl": 244, "horsepower": 577, "weight": 5800, "accel": 4.4}},
+    {"_id": 123, "descr": "renault duster 1.6", "year": 2024, "model": {"_id": 35, "name": "renault"}, "maker": {"_id": 15, "name": "renault", "country": "france", "continent": "europe"}, "specs": {"mpg": 32, "cylinders": 4, "edispl": 98, "horsepower": 113, "weight": 2600, "accel": 12}},
+    {"_id": 124, "descr": "renault kardian 1.0t", "year": 2025, "model": {"_id": 35, "name": "renault"}, "maker": {"_id": 15, "name": "renault", "country": "france", "continent": "europe"}, "specs": {"mpg": 40, "cylinders": 3, "edispl": 61, "horsepower": 99, "weight": 2600, "accel": 11}},
+    {"_id": 125, "descr": "volvo xc60 b5 2.0t", "year": 2024, "model": {"_id": 37, "name": "volvo"}, "maker": {"_id": 16, "name": "volvo", "country": "sweden", "continent": "europe"}, "specs": {"mpg": 25, "cylinders": 4, "edispl": 122, "horsepower": 247, "weight": 4200, "accel": 6.4}},
+    {"_id": 126, "descr": "volvo xc90 b6 2.0t", "year": 2024, "model": {"_id": 37, "name": "volvo"}, "maker": {"_id": 16, "name": "volvo", "country": "sweden", "continent": "europe"}, "specs": {"mpg": 22, "cylinders": 4, "edispl": 122, "horsepower": 295, "weight": 4700, "accel": 6.1}},
+    {"_id": 127, "descr": "volvo s60 b5 2.0t", "year": 2024, "model": {"_id": 37, "name": "volvo"}, "maker": {"_id": 16, "name": "volvo", "country": "sweden", "continent": "europe"}, "specs": {"mpg": 28, "cylinders": 4, "edispl": 122, "horsepower": 247, "weight": 3700, "accel": 6.3}},
+    {"_id": 128, "descr": "land rover defender 110 3.0", "year": 2024, "model": {"_id": 38, "name": "land rover"}, "maker": {"_id": 17, "name": "jlr", "country": "uk", "continent": "europe"}, "specs": {"mpg": 18, "cylinders": 6, "edispl": 183, "horsepower": 395, "weight": 5100, "accel": 5.7}},
+    {"_id": 129, "descr": "land rover range rover sport 3.0", "year": 2024, "model": {"_id": 38, "name": "land rover"}, "maker": {"_id": 17, "name": "jlr", "country": "uk", "continent": "europe"}, "specs": {"mpg": 20, "cylinders": 6, "edispl": 183, "horsepower": 355, "weight": 5000, "accel": 5.7}},
+    {"_id": 130, "descr": "jaguar f-pace p250 2.0t", "year": 2024, "model": {"_id": 39, "name": "jaguar"}, "maker": {"_id": 17, "name": "jlr", "country": "uk", "continent": "europe"}, "specs": {"mpg": 24, "cylinders": 4, "edispl": 122, "horsepower": 246, "weight": 4100, "accel": 6.9}},
+    {"_id": 131, "descr": "jaguar f-type r 5.0", "year": 2024, "model": {"_id": 39, "name": "jaguar"}, "maker": {"_id": 17, "name": "jlr", "country": "uk", "continent": "europe"}, "specs": {"mpg": 18, "cylinders": 8, "edispl": 305, "horsepower": 575, "weight": 3900, "accel": 3.5}},
+    {"_id": 132, "descr": "ferrari roma 3.9", "year": 2024, "model": {"_id": 40, "name": "ferrari"}, "maker": {"_id": 18, "name": "ferrari", "country": "italy", "continent": "europe"}, "specs": {"mpg": 17, "cylinders": 8, "edispl": 238, "horsepower": 612, "weight": 3460, "accel": 3.4}},
+    {"_id": 133, "descr": "ferrari 812 competizione 6.5", "year": 2023, "model": {"_id": 40, "name": "ferrari"}, "maker": {"_id": 18, "name": "ferrari", "country": "italy", "continent": "europe"}, "specs": {"mpg": 14, "cylinders": 12, "edispl": 397, "horsepower": 819, "weight": 3600, "accel": 2.8}},
+    {"_id": 134, "descr": "mg zs 1.5", "year": 2024, "model": {"_id": 41, "name": "mg"}, "maker": {"_id": 19, "name": "saic", "country": "china", "continent": "asia"}, "specs": {"mpg": 34, "cylinders": 4, "edispl": 91, "horsepower": 106, "weight": 2900, "accel": 12}},
+    {"_id": 135, "descr": "mg 5 1.5", "year": 2024, "model": {"_id": 41, "name": "mg"}, "maker": {"_id": 19, "name": "saic", "country": "china", "continent": "asia"}, "specs": {"mpg": 38, "cylinders": 4, "edispl": 91, "horsepower": 111, "weight": 2700, "accel": 11.5}},
+    {"_id": 136, "descr": "mg hs 1.5t", "year": 2024, "model": {"_id": 41, "name": "mg"}, "maker": {"_id": 19, "name": "saic", "country": "china", "continent": "asia"}, "specs": {"mpg": 30, "cylinders": 4, "edispl": 91, "horsepower": 168, "weight": 3400, "accel": 9.5}},
+    {"_id": 137, "descr": "chery tiggo 4 pro 1.5", "year": 2024, "model": {"_id": 42, "name": "chery"}, "maker": {"_id": 20, "name": "chery", "country": "china", "continent": "asia"}, "specs": {"mpg": 30, "cylinders": 4, "edispl": 91, "horsepower": 113, "weight": 3000, "accel": 12}},
+    {"_id": 138, "descr": "chery tiggo 7 pro 1.5t", "year": 2024, "model": {"_id": 42, "name": "chery"}, "maker": {"_id": 20, "name": "chery", "country": "china", "continent": "asia"}, "specs": {"mpg": 28, "cylinders": 4, "edispl": 91, "horsepower": 154, "weight": 3300, "accel": 10}}
+]
+resultado = db.cars.insert_many(cars)
+print("cars insertados:", len(resultado.inserted_ids))
+
+# 5. Índices
+db.cars.create_index("maker._id")
+db.cars.create_index("model._id")
+db.cars.create_index([("maker.continent", 1), ("maker.country", 1)])
+db.makers.create_index("models._id", unique=True)
+db.makers.create_index("models.name", unique=True)
+
+print("Listo: base", BD, "creada.")
